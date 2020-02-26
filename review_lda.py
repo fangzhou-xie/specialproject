@@ -70,6 +70,7 @@ class LDAReview():
         total_topics = {k: v for k, v in model.print_topics(-1)}
         topic_weight = {self.senid2docid[self.shuffled2senid[i]]: model[j]
                         for i, j in enumerate(self.bows)}
+        # save the topics, weights for docs, and document id to the orginal id
         with open('js_topics.json', 'w') as f:
             json.dump(total_topics, f)
         with open('js_weight.json', 'w') as f:
