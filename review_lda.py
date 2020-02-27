@@ -1,11 +1,13 @@
 import json
 import os
 import pdb
+import pickle
 import random
 import sqlite3 as lite
 from operator import itemgetter
-import pickle
 
+import numpy as np
+import pandas as pd
 import spacy
 from gensim.corpora import Dictionary
 from gensim.models import LdaMulticore
@@ -70,16 +72,16 @@ class LDAReview():
         model = run(self.bow_corpus, self.dictionary,
                     num_topics=topic, passes=ps,
                     alpha=alpha, eta=beta)
-        total_topics = {k: v for k, v in model.print_topics(-1)}
+        total_topics = {k: v for k, v in model.print_topics(-1, num_words=20)}
         # pdb.set_trace()
         topic_weight = {self.senid2docid[self.shuffled2senid[i]]: model[j]
                         for i, j in enumerate(self.bow_corpus)}
         # save the topics, weights for docs, and document id to the orginal id
-        with open('js_topics.json', 'wb') as f:
+        with open('js_topics.pk', 'wb') as f:
             pickle.dump(total_topics, f)
-        with open('js_weight.json', 'wb') as f:
+        with open('js_weight.pk', 'wb') as f:
             pickle.dump(topic_weight, f)
-        with open('js_docid2oldid', 'wb') as f:
+        with open('js_docid2oldid.pk', 'wb') as f:
             pickle.dump(self.docid2oldid, f)
 
 
@@ -131,12 +133,51 @@ def loaddata():
     return result
 
 
-def main():
+def cvandsave():
     id_reviews = loaddata()
     lda = LDAReview(id_reviews, 0.3)
     lda.cv()
     # pdb.set_trace()
     pass
+
+
+def interpret():
+    with open('js_topics.pk', 'rb') as f:
+        total_topics = pickle.load(f)
+    with open('js_weight.pk', 'rb') as f:
+        topic_weight = pickle.load(f)
+    with open('js_docid2oldid.pk', 'rb') as f:
+        docid2oldid = pickle.load(f)
+    # pdb.set_trace()
+    # print('end')
+    # write topics.csv
+    with open('topics.csv', 'w') as f:
+        f.write('num,' + ','.join(['word{}'.format(i)
+                                   for i in range(10)]) + '\n')
+    for k, v in total_topics.items():
+        tpweight = [i.strip() for i in v.split('+')]
+        tpweight.insert(0, str(k))
+        with open('topics.csv', 'a') as f:
+            f.write(','.join(tpweight) + '\n')
+
+    # write doc weights
+    dt = np.dtype('int,float')
+    combined_dict = {}
+    for k, v in topic_weight.items():
+        oldid = docid2oldid[k]
+        valuepair = np.array(v, dtype=dt)
+        valuepair.dtype.names = ['ind', 'weight']
+        if oldid in combined_dict:
+            combined_dict[oldid] += valuepair['weight']
+        else:
+            combined_dict[oldid] = valuepair['weight']
+    pd.DataFrame.from_dict(combined_dict, orient='index').to_csv(
+        'weights.csv', index=True)
+
+
+def main():
+    # cvandsave()
+    interpret()
 
 
 if __name__ == "__main__":
