@@ -4,6 +4,7 @@ import pdb
 import pickle
 import random
 import sqlite3 as lite
+from itertools import product
 from operator import itemgetter
 
 import numpy as np
@@ -11,6 +12,7 @@ import pandas as pd
 import spacy
 from gensim.corpora import Dictionary
 from gensim.models import LdaMulticore
+from gensim.models.coherencemodel import CoherenceModel
 
 spacy.prefer_gpu()
 random.seed(1)
@@ -31,7 +33,8 @@ class LDAReview():
         print('Random select documents: {}'.format(
             random.choice(self.sentences)))
         self.dictionary = dictionary = Dictionary(self.sentences)
-        dictionary.filter_extremes(no_below=15, no_above=0.5, keep_n=100000)
+        pdb.set_trace()
+        dictionary.filter_extremes(no_below=3, no_above=0.5, keep_n=100000)
         self.bow_corpus = bow_corpus = [
             dictionary.doc2bow(doc) for doc in self.sentences]
         doc_len = len(self.bow_corpus)  # should equal to length of sentences
@@ -47,42 +50,51 @@ class LDAReview():
 
     def cv(self):
         'cross validate the hyper-parameters. log_perplexity smaller the better'
-        best_ppl = 1e6
-        best_para = {'topic': 30,
-                     'ps': 2,
-                     'alpha': 0.5,
-                     'beta': 5}
-        # for topic in [20, 30]:
-        #     for ps in [2, 4]:
-        #         for alpha in [0.05, 0.1, 0.5, 1, 5]:
-        #             for beta in [0.05, 0.1, 0.5, 1, 5]:
-        #                 model = run(self.train_bows, self.dictionary,
-        #                             num_topics=topic, passes=ps,
-        #                             alpha=alpha, eta=beta)
-        #                 log_ppl = model.log_perplexity(self.test_bows)
-        #                 if log_ppl < best_ppl:
-        #                     best_ppl = log_ppl
-        #                     best_para['alpha'] = alpha
-        #                     best_para['beta'] = beta
-        #                     best_para['ps'] = ps
-        #                     best_para['topic'] = topic
-        alpha, beta, ps, topic = [best_para[i]
-                                  for i in sorted(best_para, key=itemgetter(0))]
-        print(best_para)
-        model = run(self.bow_corpus, self.dictionary,
-                    num_topics=topic, passes=ps,
-                    alpha=alpha, eta=beta)
-        total_topics = {k: v for k, v in model.print_topics(-1, num_words=20)}
-        # pdb.set_trace()
-        topic_weight = {self.senid2docid[self.shuffled2senid[i]]: model[j]
-                        for i, j in enumerate(self.bow_corpus)}
-        # save the topics, weights for docs, and document id to the orginal id
-        with open('js_topics.pk', 'wb') as f:
-            pickle.dump(total_topics, f)
-        with open('js_weight.pk', 'wb') as f:
-            pickle.dump(topic_weight, f)
-        with open('js_docid2oldid.pk', 'wb') as f:
-            pickle.dump(self.docid2oldid, f)
+        # best_ppl = 1e6
+        # best_para = {'topic': 30,
+        #              'ps': 2}
+        params = [range(0, 20, 2), range(2, 5, 2)]
+        df = pd.DataFrame(list(product(*params)),
+                          columns=['topics', 'passes'])
+        df['ppl'] = np.nan
+        df['coh'] = np.nan
+        for topic, ps in product(*params):
+            model = run(self.train_bows, self.dictionary,
+                        num_topics=topic, passes=ps,
+                        alpha='auto', eta='auto')
+            log_ppl = model.log_perplexity(self.test_bows)
+            cm = CoherenceModel(model=model,
+                                corpus=self.bow_corpus,
+                                coherence='u_mass')
+            coherence = cm.get_coherence()  # get coherence value
+            df.loc[(df['topics']) & (df['passes']), 'ppl'] = log_ppl
+            df.loc[(df['topics']) & (df['passes']), 'coh'] = coherence
+
+        df.to_csv('parameters.csv', index=False, header=True)
+
+    def run(self, loss='coh'):
+        if os.path.exists('parameters.csv'):
+            df = pd.read_csv('parameters.csv', header=0)
+            if loss == 'ppl':
+                topic, ps = df.loc[df['ppl'].idxmin()]['topics':'passes']
+            elif loss == 'coh':
+                topic, ps = df.loc[df['coh'].idxmin()]['topics':'passes']
+            model = run(self.bow_corpus, self.dictionary,
+                        num_topics=topic, passes=ps,
+                        alpha='auto', eta='auto')
+            total_topics = {k: v for k,
+                            v in model.print_topics(-1, num_words=20)}
+            topic_weight = {self.senid2docid[self.shuffled2senid[i]]: model[j]
+                            for i, j in enumerate(self.bow_corpus)}
+            # save the topics, weights for docs, and document id to the orginal id
+            with open('js_topics.pk', 'wb') as f:
+                pickle.dump(total_topics, f)
+            with open('js_weight.pk', 'wb') as f:
+                pickle.dump(topic_weight, f)
+            with open('js_docid2oldid.pk', 'wb') as f:
+                pickle.dump(self.docid2oldid, f)
+        else:
+            self.cv(loss)
 
 
 def run(bow_corpus, dictionary,
@@ -136,7 +148,7 @@ def loaddata():
 def cvandsave():
     id_reviews = loaddata()
     lda = LDAReview(id_reviews, 0.3)
-    lda.cv()
+    lda.run()
     # pdb.set_trace()
     pass
 
@@ -176,8 +188,8 @@ def interpret():
 
 
 def main():
-    # cvandsave()
-    interpret()
+    cvandsave()
+    # interpret()
 
 
 if __name__ == "__main__":
