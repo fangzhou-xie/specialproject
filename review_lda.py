@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import spacy
 from gensim.corpora import Dictionary
-from gensim.models import LdaMulticore
+from gensim.models import LdaModel, LdaMulticore
 from gensim.models.coherencemodel import CoherenceModel
 
 spacy.prefer_gpu()
@@ -33,7 +33,7 @@ class LDAReview():
         print('Random select documents: {}'.format(
             random.choice(self.sentences)))
         self.dictionary = dictionary = Dictionary(self.sentences)
-        pdb.set_trace()
+        # pdb.set_trace()
         dictionary.filter_extremes(no_below=3, no_above=0.5, keep_n=100000)
         self.bow_corpus = bow_corpus = [
             dictionary.doc2bow(doc) for doc in self.sentences]
@@ -53,35 +53,39 @@ class LDAReview():
         # best_ppl = 1e6
         # best_para = {'topic': 30,
         #              'ps': 2}
-        params = [range(0, 20, 2), range(2, 5, 2)]
+        params = [range(2, 20, 2), range(2, 5, 2)]
         df = pd.DataFrame(list(product(*params)),
                           columns=['topics', 'passes'])
         df['ppl'] = np.nan
         df['coh'] = np.nan
+        # pdb.set_trace()
         for topic, ps in product(*params):
             model = run(self.train_bows, self.dictionary,
-                        num_topics=topic, passes=ps,
-                        alpha='auto', eta='auto')
+                        num_topics=topic, passes=ps)
+            # alpha='auto',eta='auto')
             log_ppl = model.log_perplexity(self.test_bows)
             cm = CoherenceModel(model=model,
                                 corpus=self.bow_corpus,
                                 coherence='u_mass')
             coherence = cm.get_coherence()  # get coherence value
-            df.loc[(df['topics']) & (df['passes']), 'ppl'] = log_ppl
-            df.loc[(df['topics']) & (df['passes']), 'coh'] = coherence
+            df.loc[(df['topics'] == topic) & (
+                df['passes'] == ps), 'ppl'] = log_ppl
+            df.loc[(df['topics'] == topic) & (
+                df['passes'] == ps), 'coh'] = coherence
+            # pdb.set_trace()
 
         df.to_csv('parameters.csv', index=False, header=True)
 
     def run(self, loss='coh'):
         if os.path.exists('parameters.csv'):
             df = pd.read_csv('parameters.csv', header=0)
+            # pdb.set_trace()
             if loss == 'ppl':
                 topic, ps = df.loc[df['ppl'].idxmin()]['topics':'passes']
             elif loss == 'coh':
                 topic, ps = df.loc[df['coh'].idxmin()]['topics':'passes']
             model = run(self.bow_corpus, self.dictionary,
-                        num_topics=topic, passes=ps,
-                        alpha='auto', eta='auto')
+                        num_topics=int(topic), passes=int(ps))
             total_topics = {k: v for k,
                             v in model.print_topics(-1, num_words=20)}
             topic_weight = {self.senid2docid[self.shuffled2senid[i]]: model[j]
@@ -94,12 +98,13 @@ class LDAReview():
             with open('js_docid2oldid.pk', 'wb') as f:
                 pickle.dump(self.docid2oldid, f)
         else:
-            self.cv(loss)
+            self.cv()
 
 
 def run(bow_corpus, dictionary,
         num_topics=10, passes=2, n_workers=20, **kwargs):
     # best_ppl = 1e8
+    # error in multicore version
     model = LdaMulticore(bow_corpus,
                          id2word=dictionary,
                          num_topics=num_topics,
@@ -183,13 +188,13 @@ def interpret():
             combined_dict[oldid] += valuepair['weight']
         else:
             combined_dict[oldid] = valuepair['weight']
-    pd.DataFrame.from_dict(combined_dict, orient='index').to_csv(
-        'weights.csv', index=True)
+    pd.DataFrame.from_dict(combined_dict, orient='index').to_csv('weights.csv',
+                                                                 index=True)
 
 
 def main():
     cvandsave()
-    # interpret()
+    interpret()
 
 
 if __name__ == "__main__":
