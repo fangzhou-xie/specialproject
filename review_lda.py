@@ -86,6 +86,9 @@ class LDAReview():
                 topic, ps = df.loc[df['coh'].idxmin()]['topics':'passes']
             model = run(self.bow_corpus, self.dictionary,
                         num_topics=int(topic), passes=int(ps))
+            with open('bow_dict.pk', 'wb') as f:
+                pickle.dump([self.bow_corpus, self.dictionary], f)
+            model.save('lda.model')
             total_topics = {k: v for k,
                             v in model.print_topics(-1, num_words=20)}
             topic_weight = {self.senid2docid[self.shuffled2senid[i]]: model[j]
