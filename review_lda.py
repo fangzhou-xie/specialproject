@@ -44,6 +44,7 @@ class LDAReview():
         ids = list(range(doc_len))
         random.shuffle(ids)
         self.shuffled2senid = {v: k for k, v in enumerate(ids)}
+        self.shuffledbow = [bow_corpus[i] for i in ids]
 
         test_ids = ids[:round(doc_len * test_ratio)]
         train_ids = ids[round(doc_len * test_ratio):]
@@ -90,7 +91,7 @@ class LDAReview():
             model = run(self.bow_corpus, self.dictionary,
                         num_topics=int(topic), passes=int(ps))
             with open('bow_dict.pk', 'wb') as f:
-                pickle.dump([self.bow_corpus, self.dictionary], f)
+                pickle.dump([self.shuffledbow, self.dictionary], f)
             model.save('lda.model')
             total_topics = {k: v for k,
                             v in model.print_topics(-1, num_words=20)}
