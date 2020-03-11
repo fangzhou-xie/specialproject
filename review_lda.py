@@ -9,10 +9,13 @@ from operator import itemgetter
 
 import numpy as np
 import pandas as pd
+import pyLDAvis
+import pyLDAvis.gensim
 import spacy
 from gensim.corpora import Dictionary
 from gensim.models import LdaModel, LdaMulticore
 from gensim.models.coherencemodel import CoherenceModel
+from IPython.display import Image
 
 spacy.prefer_gpu()
 random.seed(1)
@@ -195,9 +198,21 @@ def interpret():
                                                                  index=True)
 
 
+def ldaplot():
+    model = LdaMulticore.load('lda.model')
+    with open('bow_dict.pk', 'rb') as f:
+        bow, dict = pickle.load(f)
+    # pdb.set_trace()
+    vis = pyLDAvis.gensim.prepare(model, bow, dict)
+    # pyLDAvis.display(vis)
+    # pdb.set_trace()
+    pyLDAvis.save_html(vis, 'lda.html')
+
+
 def main():
     cvandsave()
     interpret()
+    ldaplot()
 
 
 if __name__ == "__main__":
