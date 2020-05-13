@@ -1,0 +1,55 @@
+\documentclass[oneside,12pt,letterpaper]{article}
+
+% \usepackage{tikz}
+% \usepackage[toc,page]{appendix}
+\usepackage{pdfpages}
+\usepackage{amsfonts,amsmath,amssymb,amsthm,mathrsfs}
+\usepackage{stmaryrd}
+\usepackage{indentfirst}
+\usepackage{float}
+\usepackage[left=2.5cm, right=2.5cm, top=3cm]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs, array, longtable, ragged2e, pdflscape}
+\usepackage{listings}
+
+\newtheorem{theorem}{Theorem}%[section]
+\renewcommand{\thetheorem}{\arabic{theorem}}
+% \setcounter{thm}{0}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{question}[theorem]{Question}
+\newtheorem{definition}[theorem]{Definition}
+% \newtheorem{lemma}[theorem]{Lemma}
+\newtheorem*{remark}{Remark}
+% \renewcommand{\thethm}{\arabic{thm}}
+% Remove subsection from theorem counter representation
+
+\lstdefinestyle{Python}{
+    language        = Python,
+    basicstyle      = \tiny,
+    keywordstyle    = \color{blue},
+    keywordstyle    = [2] \color{teal}, % just to check that it works
+    stringstyle     = \color{green},
+    commentstyle    = \color{red}\ttfamily
+}
+
+\usepackage{fancyhdr}
+\setlength{\headheight}{27.5pt}
+\pagestyle{fancy}
+
+\title{Source Code for the Generation of Review Topics' Weight}
+\author{Fangzhou Xie}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+Here we attach the codes for preprocessing our review scores
+to topic-weights.
+
+
+\lstinputlisting[language=Python]{review_lda.py}
+
+
+\end{document}
